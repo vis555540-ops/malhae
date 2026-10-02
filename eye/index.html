@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#101317">
+<title>말해요 · 눈으로 (시험판)</title>
+<style>
+  :root{
+    --bg:#101317; --panel:#1a1f26; --ink:#F2F0EA; --muted:#8B93A0;
+    --on:#FFD24A; --ok:#4ADE80; --warn:#F87171; --line:#2A313B;
+    --cell: 52px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%; height:100dvh}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+
+  header{display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line)}
+  h1{font-size:16px; margin:0; font-weight:600; letter-spacing:-.01em}
+  .tag{font-size:11px; color:var(--muted)}
+  .spacer{flex:1}
+
+  button{font:inherit; color:inherit; background:none; border:0; cursor:pointer}
+  .mini{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:8px 12px; font-size:13px; min-height:40px;
+  }
+  .mini.live{border-color:var(--ok); color:var(--ok)}
+
+  /* 눈 상태 표시줄 */
+  .meter{padding:8px 14px; border-bottom:1px solid var(--line); background:#141922}
+  .bar{height:12px; background:#232a34; border-radius:99px; overflow:hidden; position:relative}
+  .bar i{display:block; height:100%; width:0; background:var(--ok); transition:width .06s linear}
+  .bar u{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--warn)}
+  .meterrow{display:flex; align-items:center; gap:10px; font-size:12px; color:var(--muted); margin-bottom:6px}
+  .meterrow b{color:var(--ink); font-weight:600}
+  .hold{color:var(--on)}
+
+  main{flex:1; min-height:0; overflow:hidden; padding:10px 12px; display:flex; flex-direction:column; gap:8px}
+  .crumb{font-size:12px; color:var(--muted); flex:none; text-align:center}
+
+  /* 눈으로 위아래를 보는 자리.
+     눈길이 실제로 그쪽으로 가야 값이 잡히므로, 화면 위아래 끝에 크게 둔다. */
+  .look{
+    flex:none; height:clamp(96px, 17vh, 170px);
+    border-radius:16px; background:#182130; border:2px solid #26344a;
+    color:#7FA5D8; font-size:44px; line-height:1; display:flex; align-items:center; justify-content:center;
+    transition:background .1s, border-color .1s, color .1s;
+  }
+  .look.hit{background:#20406E; border-color:#5B9BFF; color:#DCEBFF}
+
+  /* 시작 보정 화면 */
+  #cal{
+    position:fixed; inset:0; background:#0B0E12; z-index:50;
+    display:none; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding:24px;
+    text-align:center;
+  }
+  #cal.show{display:flex}
+  #calMsg{font-size:clamp(26px,7vw,40px); font-weight:700; line-height:1.35}
+  #calSub{font-size:15px; color:var(--muted); line-height:1.6}
+  #calVal{font-size:15px; color:var(--on); font-variant-numeric:tabular-nums}
+  #calRing{
+    width:120px; height:120px; border-radius:50%; border:8px solid #232C3A;
+    display:flex; align-items:center; justify-content:center; font-size:38px; font-weight:700; color:var(--on);
+  }
+  #cal .arrow{font-size:64px; color:#5B9BFF}
+
+  /* ★ 볼 지점(타겟).
+     현장 시험에서 배운 점: 시선을 옮기려면 보이는 점이 있어야 한다.
+     사람 눈은 '위를 보세요' 라는 말만으로는 안 올라간다. 볼 것이 있어야 올라간다.
+     그래서 화면 맨 위·가운데·맨 아래에 실제로 점을 띄우고 그걸 보게 한다. */
+  #calDot{
+    position:fixed; left:50%; transform:translateX(-50%);
+    width:64px; height:64px; border-radius:50%;
+    background:#5B9BFF; box-shadow:0 0 0 10px rgba(91,155,255,.22), 0 0 40px rgba(91,155,255,.6);
+    display:none; z-index:60;
+    transition:top .45s cubic-bezier(.4,0,.2,1);
+    animation:calPulse 1.1s ease-in-out infinite;
+  }
+  #calDot.show{display:block}
+  @keyframes calPulse{
+    0%,100%{ transform:translateX(-50%) scale(1) }
+    50%    { transform:translateX(-50%) scale(1.18) }
+  }
+  /* 목록이 화면보다 길면 따라 움직인다. 스크롤 막대는 감춘다 — 볼 사람이 손을 못 쓴다 */
+  .list{flex:1; min-height:0; display:flex; flex-direction:column; gap:8px; overflow-y:auto; scrollbar-width:none}
+  .list::-webkit-scrollbar{display:none}
+  .cell{
+    flex:1 1 0; min-height:var(--cell); display:flex; align-items:center; gap:12px;
+    background:var(--panel); border:2px solid transparent; border-radius:16px;
+    padding:0 16px; font-size:clamp(18px,4.6vw,26px); font-weight:600; letter-spacing:-.01em;
+    transition:background .12s, border-color .12s;
+  }
+  .cell.on{background:#3A3212; border-color:var(--on); color:#FFF3CF}
+  .cell.picked{background:#123020; border-color:var(--ok)}
+  .cell .n{font-size:12px; color:var(--muted); font-weight:500; min-width:22px}
+  .cell.call{background:#301416; border-color:#5A2226}
+  .cell.call.on{background:#5A1E22; border-color:var(--warn); color:#FFE1E1}
+
+  /* 아래 여백에 폰 제스처바(홈 바) 높이를 더한다. 안 그러면 버튼이 그 밑에 깔린다. */
+  footer{
+    padding:10px 14px; padding-bottom:calc(10px + env(safe-area-inset-bottom, 0px));
+    border-top:1px solid var(--line); display:flex; gap:8px; align-items:center; flex:none;
+  }
+  .say{flex:1; font-size:14px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+  /* 설정 */
+  dialog{border:0; border-radius:16px; background:var(--panel); color:var(--ink); padding:18px; width:min(420px,92vw)}
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  label{display:block; font-size:13px; color:var(--muted); margin:14px 0 6px}
+  input[type=range]{width:100%}
+  .val{color:var(--on); font-weight:600}
+  .row{display:flex; gap:8px; margin-top:16px}
+  .row .mini{flex:1; text-align:center}
+
+  .note{font-size:12px; color:var(--muted); line-height:1.6}
+  video,canvas.hidden{display:none}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>말해요 · 눈으로</h1>
+  <span class="tag">시험판</span>
+  <span class="spacer"></span>
+  <button class="mini" id="setBtn">설정</button>
+  <button class="mini" id="camBtn">눈 켜기</button>
+</header>
+
+<div class="meter">
+  <div class="meterrow">
+    <span>눈 감김 <b id="valTxt">—</b></span>
+    <span id="holdTxt" class="hold"></span>
+    <span class="spacer"></span>
+    <span id="stat">카메라 꺼짐</span>
+  </div>
+  <div class="bar"><i id="barFill"></i><u id="barMark"></u></div>
+</div>
+
+<main>
+  <button class="look" id="upZone">▲</button>
+  <div class="list" id="list"></div>
+  <button class="look" id="dnZone">▼</button>
+  <div class="crumb" id="crumb"></div>
+</main>
+
+<footer>
+  <div class="say" id="say">준비됨</div>
+  <button class="mini" id="tapBtn">손으로 선택</button>
+</footer>
+
+<video id="vid" playsinline muted></video>
+
+<div id="cal">
+  <div class="arrow" id="calArrow"></div>
+  <div id="calDot"></div>
+  <div id="calMsg">준비</div>
+  <div id="calRing">3</div>
+  <div id="calSub">화면을 얼굴 앞에 두고 그대로 계세요</div>
+  <div id="calVal"></div>
+</div>
+
+<dialog id="dlg">
+  <h1 style="font-size:16px;margin:0 0 4px">설정</h1>
+  <p class="note">숫자를 바꾸면 바로 반영됩니다. 사용자에게 맞을 때까지 보호자가 먼저 맞춰 보세요.</p>
+
+  <label>칸이 넘어가는 속도 — <span class="val" id="dwellV"></span>초</label>
+  <input type="range" id="dwell" min="0.8" max="4" step="0.1">
+
+  <label>눈 감았다고 볼 기준 — <span class="val" id="thrV"></span></label>
+  <input type="range" id="thr" min="0.2" max="0.9" step="0.02">
+
+  <label>몇 초 감아야 선택 — <span class="val" id="holdV"></span>초</label>
+  <input type="range" id="hold" min="0.2" max="2" step="0.05">
+
+  <p class="note" style="margin-top:14px">
+    보통 깜빡임은 0.3초쯤입니다. 그보다 길게 잡아야 무심코 깜빡였을 때 잘못 골라지지 않습니다.
+  </p>
+
+  <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+
+  <label>눈동자를 굴렸다고 볼 기준 — <span class="val" id="lookV"></span></label>
+  <input type="range" id="look" min="0.2" max="0.9" step="0.02">
+  <p class="note">
+    눈을 위로 뜨면 한 칸 올라가고 아래로 내리면 한 칸 내려갑니다.
+    잘 안 움직이면 이 숫자를 낮추고, 가만히 있는데 저절로 움직이면 올리세요.
+    화면 위쪽 <b>↑ ↓</b> 숫자를 보면서 맞추면 됩니다.
+  </p>
+
+  <div class="row">
+    <button class="mini" id="autoBtn">자동으로 훑기: 켬</button>
+  </div>
+  <p class="note">
+    자동 훑기를 끄면 칸이 저절로 넘어가지 않고, 눈동자로만 움직입니다.
+    눈을 위아래로 움직이실 수 있으면 끄는 편이 훨씬 빠릅니다.
+  </p>
+
+  <div class="row">
+    <button class="mini" id="calBtn">눈 다시 맞추기</button>
+  </div>
+  <p class="note">
+    쓰는 사람이 바뀌었거나, 앉은 자세·안경·불빛이 달라지면 다시 맞추세요.
+    위·아래·감기를 3초씩 시키고 그 사람에 맞는 숫자를 알아서 정합니다.
+  </p>
+
+  <div class="row">
+    <button class="mini" id="closeDlg">닫기</button>
+  </div>
+</dialog>
+
+<script type="module">
+import { FilesetResolver, FaceLandmarker }
+  from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+
+/* ───────── 문구 ─────────
+   실제 사용 현장에서 고른 짧은 목록.
+   앞의 다섯은 사람을 부르고 눈길을 옮기는 말, 뒤의 넷은 '어디가 가려운지' 짚는 말이다.
+   ⚠️ 늘릴 때도 짧게. 칸 하나 넘어가는 데 1.8초라 목록이 길면 그만큼 늦어진다. */
+const PHRASES = [
+  "여보",
+  "와봐",
+  "여기",
+  "여기 봐봐",
+  "아니야 다른 데야",
+  "귓구멍",
+  "입안",
+  "입술",
+  "목"
+];
+// ⚠️ 일부 폰에서 맨 아래 칸이 잘렸다.
+//    처음엔 화면에 들어가는 칸 수를 재서 쪽을 나눴는데, '다음' 칸이 생기면 그만큼 느려지고
+//    폰마다 생겼다 없어졌다 해서 더 헷갈렸다. 그래서 쪽 나누기를 아예 버리고
+//    목록이 길면 따라 움직이게(scrollIntoView) 바꿨다. 어떤 화면에서도 지금 칸은 보인다.
+
+/* ───────── 설정값 ───────── */
+const cfgDefault = { dwell:1.8, thr:0.45, hold:0.6, look:0.5, auto:true, calibrated:false };
+let cfg = { ...cfgDefault, ...JSON.parse(localStorage.getItem("malhae_eye")||"{}") };
+const saveCfg = () => localStorage.setItem("malhae_eye", JSON.stringify(cfg));
+
+/* ───────── 소리 ───────── */
+let voice=null;
+const pickVoice = () => {
+  const vs = speechSynthesis.getVoices();
+  voice = vs.find(v=>/ko(-|_)?KR/i.test(v.lang)) || vs.find(v=>/ko/i.test(v.lang)) || null;
+};
+pickVoice(); speechSynthesis.onvoiceschanged = pickVoice;
+
+function speak(t){
+  if(!t) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(t);
+  u.lang="ko-KR"; if(voice) u.voice=voice; u.rate=.95;
+  speechSynthesis.speak(u);
+  document.getElementById("say").textContent = t;
+}
+window.malhaeSpeak = speak; // 조이스틱(../joystick.js)도 같은 목소리로
+
+let ac=null;
+function alarm(){
+  // 말이 아니라 소리로 사람을 부른다. 방에 아무도 없을 때를 위한 것.
+  ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+  if(ac.state==="suspended") ac.resume();
+  const t0 = ac.currentTime;
+  for(let i=0;i<6;i++){
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.type="square"; o.frequency.value = i%2 ? 880 : 1320;
+    g.gain.setValueAtTime(0, t0+i*0.28);
+    g.gain.linearRampToValueAtTime(0.5, t0+i*0.28+0.02);
+    g.gain.linearRampToValueAtTime(0, t0+i*0.28+0.24);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t0+i*0.28); o.stop(t0+i*0.28+0.26);
+  }
+  document.getElementById("say").textContent = "사람을 부르는 중…";
+  setTimeout(()=>speak("불러주세요. 도와주세요."), 1900);
+}
+
+/* ───────── 화면 구성 · 스캔 ───────── */
+const listEl  = document.getElementById("list");
+const crumbEl = document.getElementById("crumb");
+
+let items = [];
+let idx   = 0;
+let timer = null;
+
+function buildItems(){
+  // 쪽 나누기를 없앴다. '다음' 칸이 생기면 그만큼 고르는 데 더 걸리고,
+  // 폰 크기에 따라 생겼다 없어졌다 해서 쓰는 사람이 헷갈린다.
+  // 화면보다 길면 목록이 따라 움직이게 해서 지금 칸은 언제나 보이게 한다.
+  items = [{label:"🔔 사람 불러주세요", kind:"call"}]
+    .concat(PHRASES.map(p=>({label:p, kind:"say"})));
+  crumbEl.textContent = "눈을 꾹 감으면 말합니다";
+  idx = 0;
+  render();
+}
+
+function render(){
+  listEl.innerHTML = "";
+  items.forEach((it,i)=>{
+    const b = document.createElement("button");
+    b.className = "cell" + (i===idx?" on":"") + (it.kind==="call"?" call":"");
+    b.innerHTML = `<span class="n">${i+1}</span><span>${it.label}</span>`;
+    b.onclick = ()=>{ idx=i; render(); choose(); };
+    listEl.appendChild(b);
+  });
+  // 화면보다 목록이 길면 지금 칸이 안 보일 수 있다. 안 보이면 못 고른다.
+  const cur = listEl.children[idx];
+  if(cur) cur.scrollIntoView({block:"nearest"});
+}
+
+function step(){
+  idx = (idx+1) % items.length;
+  render();
+}
+function startScan(){ stopScan(); timer = setInterval(step, cfg.dwell*1000); }
+function stopScan(){ if(timer){ clearInterval(timer); timer=null; } }
+
+function choose(){
+  const it = items[idx];
+  if(!it) return;
+  const el = listEl.children[idx];
+  if(el){ el.classList.add("picked"); setTimeout(()=>el.classList.remove("picked"), 400); }
+
+  if(it.kind==="call"){ alarm(); return; }
+  if(it.kind==="say"){ speak(it.label); return; }
+}
+
+document.getElementById("tapBtn").onclick = ()=>choose();
+
+/* ───────── 눈 읽기 ───────── */
+const vid = document.getElementById("vid");
+const barFill = document.getElementById("barFill");
+const barMark = document.getElementById("barMark");
+const valTxt  = document.getElementById("valTxt");
+const holdTxt = document.getElementById("holdTxt");
+const stat    = document.getElementById("stat");
+const camBtn  = document.getElementById("camBtn");
+
+let landmarker=null, running=false, closedSince=null, fired=false, wakeLock=null;
+
+async function startCam(){
+  try{
+    stat.textContent = "준비 중…";
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:"user", width:{ideal:640}, height:{ideal:480} }, audio:false
+    });
+    vid.srcObject = stream; await vid.play();
+
+    if(!landmarker){
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+      landmarker = await FaceLandmarker.createFromOptions(vision,{
+        baseOptions:{ modelAssetPath:
+          "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task" },
+        outputFaceBlendshapes:true, runningMode:"VIDEO", numFaces:1
+      });
+    }
+
+    try{ wakeLock = await navigator.wakeLock.request("screen"); }catch(e){}
+
+    running = true;
+    camBtn.textContent = "눈 끄기";
+    camBtn.classList.add("live");
+    stat.textContent = "보는 중";
+    if(cfg.auto) startScan();
+    loop();
+    // 처음 켠 사람이면 눈을 먼저 재고 시작한다
+    if(!cfg.calibrated) calibrate();
+  }catch(e){
+    stat.textContent = "카메라 안 됨: " + (e && e.name ? e.name : e);
+  }
+}
+
+function stopCam(){
+  running = false;
+  stopScan();
+  if(vid.srcObject){ vid.srcObject.getTracks().forEach(t=>t.stop()); vid.srcObject=null; }
+  if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
+  camBtn.textContent = "눈 켜기";
+  camBtn.classList.remove("live");
+  stat.textContent = "카메라 꺼짐";
+  barFill.style.width = "0%";
+  valTxt.textContent = "—"; holdTxt.textContent = "";
+}
+
+camBtn.onclick = ()=> running ? stopCam() : startCam();
+
+// 눈동자를 위아래로 굴리면 칸이 따라 움직인다.
+// 한 번 굴릴 때 한 칸만 가야 한다 — 계속 위를 보고 있다고 계속 올라가면 못 쓴다.
+// 그래서 가운데로 돌아와야(armed=false) 다음 한 칸이 먹는다.
+let armed = false, lastMove = 0;
+const upZone = document.getElementById("upZone");
+const dnZone = document.getElementById("dnZone");
+
+/* ───────── 시작 보정 ─────────
+   사람마다 눈 크기·안경·앉은 각도가 다르다. 기본 숫자로는 누구에게도 안 맞는다.
+   그래서 켤 때 한 번, 그 사람 눈을 직접 재서 기준을 정한다. */
+const calEl   = document.getElementById("cal");
+const calMsg  = document.getElementById("calMsg");
+const calSub  = document.getElementById("calSub");
+const calRing = document.getElementById("calRing");
+const calVal  = document.getElementById("calVal");
+const calArrow= document.getElementById("calArrow");
+
+let sample = null;   // 보정 중일 때만 값이 쌓인다. loop() 가 채운다.
+
+const wait = ms => new Promise(r=>setTimeout(r, ms));
+
+// dot = "위" | "가운데" | "아래" | null(안 띄움)
+// 말로만 "위를 보세요" 하면 눈이 안 올라간다. 볼 것을 실제로 띄워야 올라간다.
+function setDot(where){
+  const d = document.getElementById("calDot");
+  if(!where){ d.classList.remove("show"); return; }
+  const pos = { "위":"6vh", "가운데":"calc(50vh - 32px)", "아래":"calc(94vh - 64px)" };
+  d.style.top = pos[where];
+  d.classList.add("show");
+}
+
+async function collect(msg, sub, arrow, ms, dot){
+  setDot(dot || null);
+  calArrow.textContent = arrow;
+  calMsg.textContent = msg;
+  calSub.textContent = sub;
+  sample = [];
+  const t0 = performance.now();
+  while(performance.now() - t0 < ms){
+    const left = Math.ceil((ms - (performance.now()-t0))/1000);
+    calRing.textContent = left;
+    const n = sample.length;
+    calVal.textContent = n ? `읽는 중 ${n}회` : "얼굴을 찾는 중…";
+    await wait(120);
+  }
+  const got = sample; sample = null;
+  return got;
+}
+
+// 가운데 값과 최대값 사이 어디쯤을 기준으로 삼을지. 너무 낮으면 저절로 움직이고, 높으면 안 먹는다.
+function pick(baseArr, maxArr, key){
+  if(!baseArr.length || !maxArr.length) return null;
+  const avg = a => a.reduce((s,x)=>s+x[key],0)/a.length;
+  const base = avg(baseArr);
+  // 최대값은 상위 30% 만 평균낸다 (눈을 다 못 올린 순간이 섞이므로)
+  const sorted = maxArr.map(x=>x[key]).sort((a,b)=>b-a);
+  const top = sorted.slice(0, Math.max(1, Math.round(sorted.length*0.3)));
+  const peak = top.reduce((s,x)=>s+x,0)/top.length;
+  if(peak - base < 0.08) return null;          // 차이가 없으면 그 동작은 못 쓰는 것
+  return Math.min(0.9, Math.max(0.15, base + (peak - base) * 0.45));
+}
+
+async function calibrate(){
+  calEl.classList.add("show");
+  const wasAuto = cfg.auto; cfg.auto = false; stopScan();
+
+  await collect("준비하세요", "화면을 얼굴 앞에 두고 그대로 계세요", "", 2000, null);
+  const mid  = await collect("파란 점을 보세요", "눈을 편하게 뜨고 점만 보시면 됩니다", "", 3000, "가운데");
+  const up   = await collect("점이 위로 갔어요", "고개는 그대로, 눈으로만 점을 따라가세요", "", 3000, "위");
+  const dn   = await collect("점이 아래로 갔어요", "고개는 그대로, 눈으로만 점을 따라가세요", "", 3000, "아래");
+  const blk  = await collect("눈을 꾹 감으세요", "숫자가 사라질 때까지 감고 계세요", "—", 3000, null);
+
+  const lookUp = pick(mid, up, "up");
+  const lookDn = pick(mid, dn, "dn");
+  const blink  = pick(mid, blk, "v");
+
+  let msg = [], ok = true;
+  if(lookUp && lookDn){ cfg.look = Math.min(lookUp, lookDn); msg.push("위아래 ✔"); }
+  else { ok = false; msg.push("위아래 ✖"); }
+  if(blink){ cfg.thr = blink; msg.push("감기 ✔"); }
+  else { ok = false; msg.push("감기 ✖"); }
+
+  cfg.auto = ok ? false : wasAuto;   // 눈으로 다 되면 자동 훑기는 꺼도 된다
+  cfg.calibrated = true;
+  saveCfg(); syncCfg();
+
+  calArrow.textContent = ok ? "✓" : "!";
+  calMsg.textContent = ok ? "맞췄습니다" : "일부는 못 맞췄어요";
+  calSub.textContent = ok
+    ? "이제 눈으로 위아래 움직이고, 꾹 감으면 말합니다"
+    : "안 잡힌 동작은 자동으로 훑어드릴게요. 설정에서 다시 맞출 수 있어요";
+  calVal.textContent = msg.join("   ");
+  calRing.textContent = "";
+  await wait(2600);
+
+  calEl.classList.remove("show");
+  if(cfg.auto && running) startScan();
+}
+
+function moveBy(d){
+  idx = (idx + d + items.length) % items.length;
+  render();
+}
+// 옆에서 돌봐주시는 분이 손으로도 옮길 수 있게
+upZone.onclick = ()=>moveBy(-1);
+dnZone.onclick = ()=>moveBy(+1);
+
+function loop(){
+  if(!running) return;
+  const now = performance.now();
+  let v = 0, up = 0, dn = 0, seen = false;
+  try{
+    const r = landmarker.detectForVideo(vid, now);
+    const bs = r.faceBlendshapes && r.faceBlendshapes[0];
+    if(bs){
+      seen = true;
+      const get = n => (bs.categories.find(c=>c.categoryName===n)||{score:0}).score;
+      v  = (get("eyeBlinkLeft")   + get("eyeBlinkRight"))   / 2;
+      up = (get("eyeLookUpLeft")  + get("eyeLookUpRight"))  / 2;
+      dn = (get("eyeLookDownLeft")+ get("eyeLookDownRight"))/ 2;
+    }
+  }catch(e){}
+
+  valTxt.textContent = seen ? `${v.toFixed(2)}  ↑${up.toFixed(2)} ↓${dn.toFixed(2)}` : "얼굴 안 보임";
+  barFill.style.width = Math.min(100, v*100) + "%";
+  barFill.style.background = v >= cfg.thr ? "var(--on)" : "var(--ok)";
+
+  // 보정 중에는 값만 모으고 아무것도 고르지 않는다
+  if(sample){
+    if(seen) sample.push({v, up, dn});
+    requestAnimationFrame(loop);
+    return;
+  }
+
+  if(seen && v >= cfg.thr){
+    // 감고 있는 동안은 눈동자 방향을 보지 않는다.
+    // 눈을 감으면 아래를 보는 것처럼 읽혀서 칸이 멋대로 내려간다.
+    if(closedSince === null){ closedSince = now; fired = false; }
+    const held = (now - closedSince)/1000;
+    holdTxt.textContent = `감은 채 ${held.toFixed(1)}초`;
+    if(!fired && held >= cfg.hold){
+      fired = true;
+      holdTxt.textContent = "선택!";
+      stopScan();
+      choose();
+      setTimeout(()=>{ if(running && cfg.auto) startScan(); }, 900);
+    }
+  }else{
+    closedSince = null; fired = false;
+    if(holdTxt.textContent !== "선택!") holdTxt.textContent = "";
+
+    upZone.classList.toggle("hit", seen && up >= cfg.look);
+    dnZone.classList.toggle("hit", seen && dn >= cfg.look);
+
+    if(seen && now - lastMove > 350){
+      if(!armed && up >= cfg.look){ moveBy(-1); armed = true; lastMove = now; holdTxt.textContent = "▲"; }
+      else if(!armed && dn >= cfg.look){ moveBy(+1); armed = true; lastMove = now; holdTxt.textContent = "▼"; }
+    }
+    if(up < cfg.look*0.6 && dn < cfg.look*0.6) armed = false;   // 가운데로 돌아오면 다시 준비
+  }
+
+  requestAnimationFrame(loop);
+}
+
+// 화면이 다시 보이면 화면꺼짐방지를 되건다 (탭 전환·잠금 후 복귀 대응)
+document.addEventListener("visibilitychange", async ()=>{
+  if(document.visibilityState==="visible" && running && !wakeLock){
+    try{ wakeLock = await navigator.wakeLock.request("screen"); }catch(e){}
+  }
+});
+
+/* ───────── 설정 화면 ───────── */
+const dlg = document.getElementById("dlg");
+const dwell = document.getElementById("dwell"), thr = document.getElementById("thr"),
+      hold = document.getElementById("hold"), look = document.getElementById("look");
+const dwellV = document.getElementById("dwellV"), thrV = document.getElementById("thrV"),
+      holdV = document.getElementById("holdV"), lookV = document.getElementById("lookV");
+const autoBtn = document.getElementById("autoBtn");
+
+function syncCfg(){
+  dwell.value=cfg.dwell; thr.value=cfg.thr; hold.value=cfg.hold; look.value=cfg.look;
+  dwellV.textContent=(+cfg.dwell).toFixed(1);
+  thrV.textContent=(+cfg.thr).toFixed(2);
+  holdV.textContent=(+cfg.hold).toFixed(2);
+  lookV.textContent=(+cfg.look).toFixed(2);
+  barMark.style.left = (cfg.thr*100)+"%";
+  autoBtn.textContent = "자동으로 훑기: " + (cfg.auto ? "켬" : "끔");
+  autoBtn.classList.toggle("live", cfg.auto);
+}
+[["dwell",dwell,dwellV,1],["thr",thr,thrV,2],["hold",hold,holdV,2],["look",look,lookV,2]].forEach(([k,el,out,d])=>{
+  el.oninput = ()=>{
+    cfg[k] = parseFloat(el.value); out.textContent = cfg[k].toFixed(d); saveCfg();
+    barMark.style.left = (cfg.thr*100)+"%";
+    if(k==="dwell" && timer) startScan();
+  };
+});
+autoBtn.onclick = ()=>{
+  cfg.auto = !cfg.auto; saveCfg(); syncCfg();
+  if(cfg.auto){ if(running) startScan(); } else stopScan();
+};
+document.getElementById("setBtn").onclick = ()=>dlg.showModal();
+document.getElementById("closeDlg").onclick = ()=>dlg.close();
+document.getElementById("calBtn").onclick = ()=>{
+  if(!running){ alert("먼저 오른쪽 위 '눈 켜기'를 눌러주세요."); return; }
+  dlg.close(); calibrate();
+};
+
+/* ───────── 시작 ───────── */
+syncCfg();
+buildItems();
+</script>
+<script src="../joystick.js?v=12"></script>
+</body>
+</html>
