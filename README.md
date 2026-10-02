@@ -21,6 +21,7 @@
 - **설정** — ⚙ 를 길게(3초) 누르면 칸 추가/삭제, 문구 고치기, 순서, 묶음, 좌우 바꾸기. (실수로 바뀌지 않게 길게 눌러야 합니다.)
 - **오프라인** — PWA라 한 번 열면 인터넷이 끊겨도 동작합니다(손글씨 인식만 인터넷 필요).
 - `type/` — 자판으로 써서 말하기. `eye/` — 눈 깜빡임으로 고르기(실험 중).
+- **English:** `en/` (SayIt) — https://vis555540-ops.github.io/malhae/en/
 
 ## 쓰는 법
 
@@ -52,7 +53,11 @@ MIT © 2026 LeDeuxions
 
 ## English
 
-**Malhae** ("Speak") is a free AAC (augmentative and alternative communication) web app for people who cannot speak but can use their hands — ALS, stroke, tracheostomy, dysarthria, etc. UI is in Korean; phrases are editable.
+**Malhae** ("Speak") is a free AAC (augmentative and alternative communication) web app for people who cannot speak but can use their hands — ALS, stroke, tracheostomy, dysarthria, etc.
+
+**English version — SayIt:** https://vis555540-ops.github.io/malhae/en/
+(*Free AAC — speak by tapping, writing, or a joystick.* English phrases, en-US voice, English handwriting recognition. Typing screen: `/en/type/`.)
+The Korean version is at the repo root; both share `joystick.js` and `emergency.js` (the English page passes its strings via `window.MALHAE_JOY` and `data-*` attributes). Phrases are editable.
 
 - Phrase tabs — tap to speak (Web Speech API).
 - Joystick + arc band — push the joystick to switch phrase bundles, tap a band cell to speak.

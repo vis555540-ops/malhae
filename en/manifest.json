@@ -1,0 +1,15 @@
+{
+  "name": "SayIt — Free AAC",
+  "short_name": "SayIt",
+  "description": "Free AAC — speak by tapping, writing, or a joystick",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0e1116",
+  "theme_color": "#1565c0",
+  "orientation": "portrait",
+  "icons": [
+    {"src":"../icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}
+  ]
+}

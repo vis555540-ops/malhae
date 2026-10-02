@@ -17,6 +17,7 @@
   header{padding:10px 12px;display:flex;align-items:center;gap:8px;flex:0 0 auto}
   header h1{font-size:18px;margin:0;font-weight:800}
   header .sub{font-size:11px;color:var(--mut)}
+  header .lang{font-size:12px;color:var(--mut);text-decoration:underline;margin-left:6px}
   #say{flex:1;min-height:64px;margin:6px 12px;background:#101722;border:2px solid #24405f;border-radius:14px;color:var(--txt);font-size:var(--big);padding:14px;resize:none}
   .row{display:flex;gap:8px;padding:0 12px}
   .btn{flex:1;padding:16px;border:0;border-radius:14px;font-size:var(--big);font-weight:800;color:#fff;background:var(--pri)}
@@ -59,6 +60,7 @@
 <header>
   <h1>🗣️ 말해요</h1>
   <span class="sub">눌러서 소리내기 · 베타</span>
+  <a class="lang" href="en/" lang="en">English</a>
 </header>
 
 <!-- 타이핑 칸 없음 (타이핑이 힘든 사용자 고려). 버튼 누르면 바로 말함 -->
@@ -74,9 +76,10 @@
 <div id="inkBig" role="dialog" aria-label="크게 보기 (누르면 닫힘)"><img alt="쓴 글씨"></div>
 
 <!-- 아래 왼쪽 조이스틱 + 둘레 호 띠(칸=말). ⚙ 3초 = 설정 -->
-<script src="joystick.js?v=12" data-gear="corner"></script>
+<script>window.MALHAE_JOY={t:{extra:'<p style="margin-top:12px;text-align:center"><a href="en/" lang="en" style="color:#8ec5ff">English</a></p>'}};</script>
+<script src="joystick.js?v=13" data-gear="corner"></script>
 <!-- 아무 데나 2초 꾹 = 긴급 알람 (빨간 화면·사이렌·「도와주세요」, 멈춤 톡으로 끔) -->
-<script src="emergency.js?v=12"></script>
+<script src="emergency.js?v=13"></script>
 
 <script>
 // ── 문구 세트 v0.1 (위관·석션·신앙 등 8카테고리 기본 문구. 자유롭게 고쳐 쓰세요) ──

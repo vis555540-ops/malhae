@@ -8,6 +8,11 @@
 (function(){
   "use strict";
   const HOLD = 2000, SHOW = 500, SLOP = 15, SAY_EVERY = 4500;
+  // 다른 말 페이지: <script src="emergency.js" data-title="🚨 HELP" data-say="Help me, please" data-stop="STOP" data-label="Emergency" data-lang="en-US">
+  // 없으면 한국어 그대로
+  const D = (document.currentScript && document.currentScript.dataset) || {};
+  const TXT = { title: D.title || "🚨 도와주세요", say: D.say || "도와주세요", stop: D.stop || "멈춤", label: D.label || "긴급", lang: D.lang || "ko-KR" };
+  const escH = t => String(t).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const css = `
   body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   input,textarea{-webkit-user-select:text;user-select:text}
@@ -22,8 +27,8 @@
   #sos button:active{background:#ffcdd2}`;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   const ring = document.createElement("div"); ring.id = "sosRing";
-  const ov = document.createElement("div"); ov.id = "sos"; ov.setAttribute("role","alertdialog"); ov.setAttribute("aria-label","긴급");
-  ov.innerHTML = '<h1>🚨 도와주세요</h1><button type="button" id="sosStop">멈춤</button>';
+  const ov = document.createElement("div"); ov.id = "sos"; ov.setAttribute("role","alertdialog"); ov.setAttribute("aria-label",TXT.label);
+  ov.innerHTML = '<h1>'+escH(TXT.title)+'</h1><button type="button" id="sosStop">'+escH(TXT.stop)+'</button>';
   function mount(){ document.body.appendChild(ring); document.body.appendChild(ov); }
   if(document.body) mount(); else document.addEventListener("DOMContentLoaded", mount);
 
@@ -52,8 +57,8 @@
   // 사이렌 잠깐 줄이고 「도와주세요」 → 다시 사이렌
   function sayHelp(){
     try{ if(gain) gain.gain.setValueAtTime(0.08, ac.currentTime); }catch(e){}
-    try{ if(typeof window.malhaeSpeak === "function") window.malhaeSpeak("도와주세요");
-         else { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance("도와주세요"); u.lang = "ko-KR"; speechSynthesis.speak(u); } }catch(e){}
+    try{ if(typeof window.malhaeSpeak === "function") window.malhaeSpeak(TXT.say);
+         else { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(TXT.say); u.lang = TXT.lang; speechSynthesis.speak(u); } }catch(e){}
     clearTimeout(muteT); muteT = setTimeout(()=>{ try{ if(gain) gain.gain.setValueAtTime(1, ac.currentTime); }catch(e){} }, 1800);
   }
   const buzz = p => { try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} };

@@ -12,11 +12,27 @@
    말하기는 페이지의 기존 함수(window.malhaeSpeak)를 그대로 쓴다. */
 (function(){
   "use strict";
-  const KEY = "malhae_joy3", OLD = "malhae_joy2";
+  // 다른 말(영어 등) 페이지는 이 스크립트 앞에 window.MALHAE_JOY = { key, oldKey, lang, first, groups, t, ... } 를 둔다.
+  // 없으면 아래 한국어 기본값 그대로 (한국어 페이지 동작은 안 바뀜)
+  const CFG = window.MALHAE_JOY || {};
+  const KEY = CFG.key || "malhae_joy3", OLD = CFG.oldKey === undefined ? "malhae_joy2" : CFG.oldKey;
+  const LANG = CFG.lang || "ko-KR";
+  const CW = CFG.charW || 1;          // 글자 폭 (한글 = 1em, 영어는 더 좁음)
+  const NAMEMAX = CFG.nameMax || 4;   // 띠 끝 묶음 이름 글자 수
+  const T = Object.assign({
+    aria: "조이스틱과 말 칸", gearAria: "조이스틱 설정 (3초 꾹 누르기)", gearTitle: "3초 꾹 누르면 설정",
+    setAria: "조이스틱 설정", setTitle: "🕹️ 말 칸 고치기",
+    help: "띠의 칸 = 말 하나. 위에서부터 왼쪽 위 → 오른쪽 아래 순서. 칸은 {min}~{max}개.<br>\n      조이스틱을 밀면 묶음이 바뀌고(방향 = 묶음), 칸을 톡 누르면 말합니다.",
+    noName: "(이름)", group: "묶음", groupPh: "묶음 이름", wordPh: "말", up: "앞으로", dn: "뒤로", del: "칸 지우기",
+    add: "＋ 칸 추가", gadd: "＋ 묶음 추가", gdel: "이 묶음 지우기", joy: "조이스틱", show: "보이기", hide: "숨기기",
+    place: "놓는 자리", left: "왼손 (왼쪽 아래)", right: "오른손 (좌우 반전)",
+    sos: "🚨 아무 데나 손가락을 움직이지 않고 2초 누르고 있으면 긴급 알람이 울립니다. 「멈춤」을 누르면 꺼집니다.",
+    reset: "처음대로", close: "닫기", save: "저장", extra: ""
+  }, CFG.t || {});
   const MINW = 4, MAXW = 8, MAXG = 8;
   // 기본 묶음 — 첫 칸 「침」
-  const FIRST = { name: "기본", words: ["침", "머리", "아니야", "오케이", "사람 불러주세요", "물"] };
-  const OLD_DEFAULT = [
+  const FIRST = CFG.first || { name: "기본", words: ["침", "머리", "아니야", "오케이", "사람 불러주세요", "물"] };
+  const OLD_DEFAULT = CFG.groups || [
     { name: "머리", words: ["머리", "머리 아파", "머리 긁어줘", "머리 올려줘", "베개"] },
     { name: "침",   words: ["침", "침 닦아줘", "석션", "입안 닦아줘", "물"] },
     { name: "대답", words: ["아니야", "오케이", "응", "잠깐"] },
@@ -55,7 +71,7 @@
       }
     }
     // 처음: 「기본」 + 예전 묶음 이어 쓰기
-    const o = read(OLD) || {};
+    const o = (OLD && read(OLD)) || {};
     const old = clean(o.groups);
     return { groups: [copy([FIRST])[0], ...(old.length ? old : copy(OLD_DEFAULT))].slice(0,MAXG), cur: 0,
              show: o.show !== false, hand: o.hand === "right" ? "right" : "left" };
@@ -67,8 +83,9 @@
   function fallbackSpeak(t){
     try{
       speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(t); u.lang="ko-KR"; u.rate=.95;
-      const v = speechSynthesis.getVoices().find(v=>/ko/i.test(v.lang)); if(v) u.voice=v;
+      const u = new SpeechSynthesisUtterance(t); u.lang=LANG; u.rate=.95;
+      const pre = LANG.slice(0,2).toLowerCase();
+      const v = speechSynthesis.getVoices().find(v=>String(v.lang).toLowerCase().startsWith(pre)); if(v) u.voice=v;
       speechSynthesis.speak(u);
     }catch(e){}
   }
@@ -104,7 +121,7 @@
         if(!cur) cur = wd; else if((cur+" "+wd).replace(/\s/g,"").length <= m) cur += " "+wd; else { lines.push(cur); cur = wd; }
       });
       if(cur) lines.push(cur);
-      const wide = Math.max(...lines.map(l=>l.replace(/\s/g,"").length + (l.split(" ").length-1)*0.3));
+      const wide = CW * Math.max(...lines.map(l=>l.replace(/\s/g,"").length + (l.split(" ").length-1)*0.3));
       const f = Math.min(maxF, w/wide, h/(lines.length*1.15));
       const score = broke ? f*0.55 : f;   // 낱말 가운데서 끊는 건 되도록 피함 (아니/야 X)
       if(score > best.s + 0.5) best = { f, lines, s: score };
@@ -169,7 +186,7 @@
   const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag);
     for(const k in attrs) e.setAttribute(k, attrs[k]); if(parent) parent.appendChild(e); return e; };
   const joy = document.createElement("div"); joy.id = "joy";
-  const svg = mk("svg", { viewBox: `0 0 ${VW} ${VH}`, role: "application", "aria-label": "조이스틱과 말 칸" });
+  const svg = mk("svg", { viewBox: `0 0 ${VW} ${VH}`, role: "application", "aria-label": T.aria });
   joy.appendChild(svg);
   let cells = [], texts = [], secs = [], knob = null, kTxt = null;
 
@@ -198,7 +215,7 @@
     const [x,y] = P(141, (RI+RO)/2+4);
     const a = mk("text", { x, y: y-8, "text-anchor": "middle", class: "gn", "font-size": 30 }, gBand); a.textContent = st.cur+1;
     const b = mk("text", { x, y: y+18, "text-anchor": "middle", class: "gn2", "font-size": 17 }, gBand);
-    b.textContent = st.groups[st.cur].name.length > 4 ? st.groups[st.cur].name.slice(0,4) : st.groups[st.cur].name;
+    b.textContent = st.groups[st.cur].name.length > NAMEMAX ? st.groups[st.cur].name.slice(0,NAMEMAX) : st.groups[st.cur].name;
   }
   // 조이스틱: 바탕을 묶음 수만큼 나눔 (방향 = 묶음)
   function drawJoy(){
@@ -311,7 +328,7 @@
 
   /* ── 설정: ⚙ 3초 꾹 ── */
   const gear = document.createElement("button"); gear.id = "joyGear"; gear.type = "button";
-  gear.setAttribute("aria-label","조이스틱 설정 (3초 꾹 누르기)"); gear.title = "3초 꾹 누르면 설정";
+  gear.setAttribute("aria-label",T.gearAria); gear.title = T.gearTitle;
   gear.innerHTML = "<i></i><span>⚙</span>";
   let gTimer = null;
   const gStop = ()=>{ clearTimeout(gTimer); gTimer = null; gear.classList.remove("hold"); };
@@ -333,24 +350,23 @@
   }
   function drawSet(){
     const g = draft[dg], n = g.words.length, G = draft.length;
-    set.innerHTML = `<div class="box" role="dialog" aria-label="조이스틱 설정">
-      <h2>🕹️ 말 칸 고치기</h2>
-      <p>띠의 칸 = 말 하나. 위에서부터 왼쪽 위 → 오른쪽 아래 순서. 칸은 ${MINW}~${MAXW}개.<br>
-      조이스틱을 밀면 묶음이 바뀌고(방향 = 묶음), 칸을 톡 누르면 말합니다.</p>
-      <div class="tabs">${draft.map((x,i)=>`<button type="button" data-g="${i}" class="${i===dg?"on":""}">${i+1}. ${esc(x.name||"(이름)")}</button>`).join("")}</div>
-      <div class="w"><b>묶음</b><input class="gn" type="text" maxlength="20" placeholder="묶음 이름" value="${esc(g.name)}"></div>
-      ${g.words.map((w,i)=>`<div class="w"><b>${i+1}</b><input class="wd" type="text" maxlength="30" placeholder="말" value="${esc(w)}">
-        <button type="button" data-up="${i}" ${i===0?"disabled":""} aria-label="앞으로">▲</button>
-        <button type="button" data-dn="${i}" ${i===n-1?"disabled":""} aria-label="뒤로">▼</button>
-        <button type="button" class="x" data-del="${i}" ${n<=MINW?"disabled":""} aria-label="칸 지우기">✕</button></div>`).join("")}
-      <div class="row"><button type="button" class="add" ${n>=MAXW?"disabled":""}>＋ 칸 추가 (${n}/${MAXW})</button></div>
-      <div class="row"><button type="button" class="gadd" ${G>=MAXG?"disabled":""}>＋ 묶음 추가</button><button type="button" class="gdel x" ${G<=1?"disabled":""}>이 묶음 지우기</button></div>
-      <p style="margin-top:14px">조이스틱</p>
-      <div class="row"><button type="button" data-v="1" class="${vis?"on":""}">보이기</button><button type="button" data-v="0" class="${vis?"":"on"}">숨기기</button></div>
-      <p style="margin-top:12px">놓는 자리</p>
-      <div class="row"><button type="button" data-h="left" class="${hand==="left"?"on":""}">왼손 (왼쪽 아래)</button><button type="button" data-h="right" class="${hand==="right"?"on":""}">오른손 (좌우 반전)</button></div>
-      <p style="margin-top:12px">🚨 아무 데나 손가락을 움직이지 않고 2초 누르고 있으면 긴급 알람이 울립니다. 「멈춤」을 누르면 꺼집니다.</p>
-      <div class="row"><button type="button" class="rst">처음대로</button><button type="button" class="cn">닫기</button><button type="button" class="ok">저장</button></div>
+    set.innerHTML = `<div class="box" role="dialog" aria-label="${esc(T.setAria)}">
+      <h2>${T.setTitle}</h2>
+      <p>${T.help.replace("{min}",MINW).replace("{max}",MAXW)}</p>
+      <div class="tabs">${draft.map((x,i)=>`<button type="button" data-g="${i}" class="${i===dg?"on":""}">${i+1}. ${esc(x.name||T.noName)}</button>`).join("")}</div>
+      <div class="w"><b>${T.group}</b><input class="gn" type="text" maxlength="20" placeholder="${esc(T.groupPh)}" value="${esc(g.name)}"></div>
+      ${g.words.map((w,i)=>`<div class="w"><b>${i+1}</b><input class="wd" type="text" maxlength="30" placeholder="${esc(T.wordPh)}" value="${esc(w)}">
+        <button type="button" data-up="${i}" ${i===0?"disabled":""} aria-label="${esc(T.up)}">▲</button>
+        <button type="button" data-dn="${i}" ${i===n-1?"disabled":""} aria-label="${esc(T.dn)}">▼</button>
+        <button type="button" class="x" data-del="${i}" ${n<=MINW?"disabled":""} aria-label="${esc(T.del)}">✕</button></div>`).join("")}
+      <div class="row"><button type="button" class="add" ${n>=MAXW?"disabled":""}>${T.add} (${n}/${MAXW})</button></div>
+      <div class="row"><button type="button" class="gadd" ${G>=MAXG?"disabled":""}>${T.gadd}</button><button type="button" class="gdel x" ${G<=1?"disabled":""}>${T.gdel}</button></div>
+      <p style="margin-top:14px">${T.joy}</p>
+      <div class="row"><button type="button" data-v="1" class="${vis?"on":""}">${T.show}</button><button type="button" data-v="0" class="${vis?"":"on"}">${T.hide}</button></div>
+      <p style="margin-top:12px">${T.place}</p>
+      <div class="row"><button type="button" data-h="left" class="${hand==="left"?"on":""}">${T.left}</button><button type="button" data-h="right" class="${hand==="right"?"on":""}">${T.right}</button></div>
+      <p style="margin-top:12px">${T.sos}</p>${T.extra}
+      <div class="row"><button type="button" class="rst">${T.reset}</button><button type="button" class="cn">${T.close}</button><button type="button" class="ok">${T.save}</button></div>
     </div>`;
   }
   function openSet(){ draft = copy(st.groups); dg = st.cur; hand = st.hand; vis = st.show; drawSet(); set.classList.add("on"); }

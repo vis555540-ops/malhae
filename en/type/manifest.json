@@ -1,0 +1,14 @@
+{
+  "name": "SayIt — Type to Speak",
+  "short_name": "SayIt Type",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0B0E12",
+  "theme_color": "#0B0E12",
+  "orientation": "portrait",
+  "icons": [
+    {"src":"../../icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}
+  ]
+}
